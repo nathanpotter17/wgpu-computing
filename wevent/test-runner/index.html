@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LayerW - WEVENT</title>
+  </head>
+  <body id="wasm-example">
+    <!-- wasm-pack & wasm-bindgen, produce the same thing! -->
+    <script type="module">
+      // Updated script.js example integrating the WEvent system
+      import init, {
+        create_timer,
+        create_event_system,
+        run_demo,
+      } from './wbg/wevent.js';
+
+      // Event processing example
+      async function runEventSystemDemo() {
+        console.log('Cross-platform event system example (WASM version)');
+        console.log('Starting event processing...');
+
+        // Create event system instance
+        const eventSystem = create_event_system();
+
+        // Push a GameStart custom event
+        eventSystem.push_custom_event('GameStart');
+
+        // Simulate 10 frames
+        for (let i = 0; i < 10; i++) {
+          // Update the event system (generates tick events)
+          eventSystem.update();
+
+          // Add a custom event every 3rd frame
+          if (i % 3 === 0) {
+            eventSystem.push_custom_event('FrameMarker');
+            console.log(
+              `Frame ${i}: Custom event 'FrameMarker' at timestamp ${Date.now()}ms`
+            );
+          }
+
+          // Log event count after processing
+          if (eventSystem.has_events()) {
+            console.log(
+              `Frame ${i}: Tick event generated, events in queue: ${eventSystem.event_count()}`
+            );
+          }
+
+          // Clear events after processing to simulate polling
+          eventSystem.clear_events();
+
+          // Simulate frame delay
+          await new Promise((resolve) => setTimeout(resolve, 16));
+        }
+
+        // Final event status
+        console.log(
+          `Event system demo completed. Final event count: ${eventSystem.event_count()}`
+        );
+      }
+
+      // Main entry point
+      async function start() {
+        try {
+          // Initialize the WASM module
+          await init();
+          console.log('WASM module initialized successfully');
+
+          // Run the simple timer demo
+          const timer = create_timer();
+          console.log('Timer created:', timer);
+
+          // Wait a bit and check the timer
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          console.log(`Elapsed time: ${timer.elapsed_ms().toFixed(2)}ms`);
+
+          // Run the built-in demo
+          const demoResult = run_demo();
+          console.log('Demo result:', demoResult);
+
+          // Run the event system demo
+          await runEventSystemDemo();
+        } catch (e) {
+          console.error('Failed to initialize or run WebAssembly module:', e);
+        }
+      }
+
+      // Start the application
+      start();
+    </script>
+  </body>
+</html>

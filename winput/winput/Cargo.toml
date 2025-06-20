@@ -1,0 +1,40 @@
+[package]
+name = "winput"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "winput"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "winput-bin"
+path = "src/main.rs"
+
+[dependencies]
+wasi = "0.14.2"
+cfg-if = "1.0.0"
+log = "0.4.27"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+sdl2 = {version = "0.37.0", features = ["bundled", "static-link"]}
+env_logger = "0.11.8"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = {version = "0.3.77", features = [
+    "Window",
+    "Navigator",
+    "Gamepad",
+    "Performance",
+    "GamepadButton",
+    "console"]}
+js-sys = "0.3.77"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+console_error_panic_hook = "0.1.7"
+console_log = "1.0.0"
+
+[profile.release]
+lto = true
+opt-level = 3

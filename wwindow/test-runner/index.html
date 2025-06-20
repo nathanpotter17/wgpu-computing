@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LayerW - WWindow</title>
+  </head>
+  <body>
+    <h1>LAYER_W: SUBMODULE_004: WWINDOW</h1>
+    <h2 style="font-style: italic">Web and Native Windowing using WebGPU</h2>
+    <div id="app"></div>
+    <script type="module">
+      import init from './wbg/wwindow.js';
+
+      init()
+        .then(() => {
+          console.log('WASM module loaded successfully');
+        })
+        .catch((error) => {
+          console.error('Failed to load WASM module:', error);
+        });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>LayerW - WINPUT</title>
+    <style>
+      body {
+        font-family: Arial;
+        padding: 20px;
+      }
+      #status {
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      #log {
+        height: 300px;
+        overflow-y: scroll;
+        border: 1px solid #ccc;
+        padding: 10px;
+        background: #f9f9f9;
+        margin-top: 20px;
+      }
+      .event-info {
+        color: blue;
+      }
+      .event-error {
+        color: red;
+      }
+      .event-warning {
+        color: orange;
+      }
+      .button-test {
+        margin: 10px 0;
+      }
+      .button-display {
+        display: inline-block;
+        margin: 5px;
+        padding: 10px 20px;
+        border: 2px solid #ccc;
+        border-radius: 5px;
+        min-width: 50px;
+      }
+      .active {
+        background-color: #4caf50;
+        color: white;
+        border-color: #2e7d32;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>LAYER-W Gamepad Test</h2>
+
+    <div class="button-test">
+      <h3>Button States:</h3>
+      <div class="button-display" id="btn-a">A</div>
+      <div class="button-display" id="btn-b">B</div>
+      <div class="button-display" id="btn-x">X</div>
+      <div class="button-display" id="btn-y">Y</div>
+    </div>
+
+    <h3>Event Log:</h3>
+    <div id="console-output"></div>
+
+    <script type="module">
+      import init, { JsEngine } from './wmpkg/winput.js';
+
+      let engine;
+      const buttonElements = {
+        a: document.getElementById('btn-a'),
+        b: document.getElementById('btn-b'),
+        x: document.getElementById('btn-x'),
+        y: document.getElementById('btn-y'),
+      };
+
+      let consoleLines = [];
+      let debugEnabled = true;
+
+      // Intercept console methods to show in our console output
+      const originalConsoleLog = console.log;
+      console.log = function (...args) {
+        originalConsoleLog.apply(console, args);
+        if (args[0] && typeof args[0] === 'string') {
+          if (
+            args[0].startsWith('A BUTTON') ||
+            args[0].startsWith('B BUTTON') ||
+            args[0].startsWith('X BUTTON') ||
+            args[0].startsWith('Y BUTTON')
+          ) {
+            logToConsole(args[0], 'success');
+          } else if (args[0].includes('UNKNOWN EVENT')) {
+            logToConsole(args[0], 'warning');
+          } else if (args[0].includes('GAMEPAD')) {
+            logToConsole(args[0], 'info');
+          } else if (debugEnabled) {
+            logToConsole(args[0], 'info');
+          }
+        }
+      };
+
+      const originalConsoleError = console.error;
+      console.error = function (...args) {
+        originalConsoleError.apply(console, args);
+        if (args[0]) {
+          logToConsole(`ERROR: ${args[0]}`, 'error');
+        }
+      };
+
+      // Console logging function
+      function logToConsole(message, type = 'info') {
+        const timestamp = performance.now().toFixed(2);
+        const line = `[${timestamp}ms] ${message}`;
+
+        consoleLines.push([type, line]);
+        if (consoleLines.length > 25) {
+          consoleLines.shift();
+        }
+
+        renderConsole();
+      }
+
+      function renderConsole() {
+        const consoleDiv = document.getElementById('console-output');
+        consoleDiv.innerHTML = '';
+
+        for (const [type, line] of consoleLines) {
+          const span = document.createElement('div');
+          span.className = type;
+          span.textContent = line + '\n';
+          consoleDiv.appendChild(span);
+        }
+
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+      }
+
+      function updateButtonStates() {
+        for (const [buttonName, buttonElement] of Object.entries(
+          buttonElements
+        )) {
+          const isPressed = engine.is_button_pressed(0, buttonName);
+          buttonElement.className = `button-display ${
+            isPressed ? 'active' : ''
+          }`;
+        }
+      }
+
+      async function start() {
+        try {
+          logToConsole('Initializing WASM module...');
+          await init();
+
+          engine = new JsEngine();
+
+          engine.start();
+          logToConsole('WASM module initialized successfully.');
+
+          requestAnimationFrame(loop);
+        } catch (error) {
+          logToConsole(`Initialization error: ${error.message}`, 'error');
+          console.error(error);
+        }
+      }
+
+      function loop() {
+        try {
+          // Update the engine
+          engine.update();
+
+          updateButtonStates();
+        } catch (error) {
+          logToConsole(`Loop error: ${error.message}`, 'error');
+          console.error(error);
+        }
+
+        requestAnimationFrame(loop);
+      }
+
+      // Start the application
+      start();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LayerW</title>
+    <style>
+      html {
+        background-color: rgb(0, 0, 0);
+      }
+
+      h1 {
+        font-size: 3rem;
+        font-family: monospace;
+        color: rgba(255, 255, 255, 0.582);
+        text-align: center;
+      }
+
+      .game-window {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 1080px;
+        height: 720px;
+        background-color: rgb(24, 24, 24);
+        border-radius: 15px;
+        padding: 1rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      #canvas {
+        min-width: 1080px;
+        min-height: 720px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>LAYERW Game Engine</h1>
+    <div class="game-window">
+      <div id="app"></div>
+    </div>
+    <script type="module">
+      import init from './wbg/layerw.js';
+
+      init().then(() => {
+        console.log('LayerW loaded successfully');
+      });
+    </script>
+  </body>
+</html>

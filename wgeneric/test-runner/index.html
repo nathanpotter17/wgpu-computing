@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>wcompute GPU Test</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        overflow-x: hidden;
+      }
+
+      .container {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(20px);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        animation: slideIn 0.6s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+
+      .title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(45deg, #fff, #e0e7ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+        opacity: 0.8;
+        font-weight: 300;
+      }
+
+      .canvas-container {
+        position: relative;
+        margin: 2rem 0;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      }
+
+      #canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 16px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 1rem;
+        margin: 1.5rem 0;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        flex: 1;
+        min-width: 120px;
+        padding: 12px 24px;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn.primary {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        border: none;
+      }
+
+      .btn.primary:hover {
+        background: linear-gradient(45deg, #5a6fd8, #6a4190);
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+
+      .status {
+        margin: 1.5rem 0;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 12px;
+        border-left: 4px solid #10b981;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.9rem;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+      }
+
+      .status.error {
+        border-left-color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+      }
+
+      .status.loading {
+        border-left-color: #f59e0b;
+        background: rgba(245, 158, 11, 0.1);
+      }
+
+      .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .test-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin: 1rem 0;
+      }
+
+      .test-item {
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        text-align: center;
+        transition: all 0.3s ease;
+      }
+
+      .test-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .test-label {
+        font-size: 0.8rem;
+        opacity: 0.7;
+        margin-bottom: 0.5rem;
+      }
+
+      .test-value {
+        font-weight: 600;
+        font-size: 1.1rem;
+      }
+
+      .fps-counter {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-family: monospace;
+      }
+
+      @media (max-width: 600px) {
+        .container {
+          margin: 1rem;
+          padding: 1.5rem;
+        }
+
+        .title {
+          font-size: 2rem;
+        }
+
+        .controls {
+          flex-direction: column;
+        }
+
+        .test-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1 class="title">wcompute</h1>
+        <p class="subtitle">GPU-Accelerated Computing in the Browser</p>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="canvas" width="400" height="400"></canvas>
+        <div class="fps-counter" id="fps">0 FPS</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn primary" onclick="startAnimation()" id="animateBtn">
+          ▶ Animate
+        </button>
+        <button class="btn" onclick="runAllTests()" id="testBtn">
+          🧪 Basic Tests
+        </button>
+        <button class="btn" onclick="runIntenseTests()" id="intenseBtn">
+          🔥 Stress Test
+        </button>
+        <button class="btn" onclick="runMLTest()" id="mlTestBtn">
+          🧠 ML Test
+        </button>
+        <button class="btn" onclick="resetDemo()" id="resetBtn">
+          🔄 Reset
+        </button>
+      </div>
+
+      <div class="test-grid">
+        <div class="test-item">
+          <div class="test-label">GPU Status</div>
+          <div class="test-value" id="gpuStatus">Initializing...</div>
+        </div>
+        <div class="test-item">
+          <div class="test-label">Frame Time</div>
+          <div class="test-value" id="frameTime">0ms</div>
+        </div>
+        <div class="test-item">
+          <div class="test-label">Compute Speed</div>
+          <div class="test-value" id="computeSpeed">0 ops/s</div>
+        </div>
+        <div class="test-item">
+          <div class="test-label">GFLOPS</div>
+          <div class="test-value" id="gflops">0</div>
+        </div>
+        <div class="test-item">
+          <div class="test-label">Total Frames</div>
+          <div class="test-value" id="frameCount">0</div>
+        </div>
+      </div>
+
+      <div class="status" id="log">
+        <span class="loading-spinner"></span>
+        Initializing GPU compute engine...
+      </div>
+    </div>
+
+    <script type="module">
+      import init, { GpuCompute } from './wbg/wcompute.js';
+
+      let gpu;
+      let animationId;
+      let isAnimating = false;
+      let startTime = performance.now();
+      let frameCount = 0;
+      let lastFrameTime = 0;
+      let fpsHistory = [];
+
+      const log = document.getElementById('log');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      function updateStatus(message, type = 'success') {
+        log.className = `status ${type}`;
+        log.innerHTML =
+          type === 'loading'
+            ? `<span class="loading-spinner"></span>${message}`
+            : message;
+
+        document.getElementById(
+          'frameTime'
+        ).textContent = `${frameTimeMs.toFixed(1)}ms`;
+        document.getElementById('frameCount').textContent = frameCount;
+
+        const fps = 1000 / frameTimeMs;
+        fpsHistory.push(fps);
+        if (fpsHistory.length > 10) fpsHistory.shift();
+
+        const avgFps =
+          fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+        document.getElementById('fps').textContent = `${avgFps.toFixed(0)} FPS`;
+      }
+
+      async function setup() {
+        try {
+          updateStatus('Loading WASM module...', 'loading');
+          await init();
+
+          updateStatus('Initializing GPU compute...', 'loading');
+          const compute = await new GpuCompute();
+          gpu = compute;
+
+          document.getElementById('gpuStatus').textContent = 'Ready ✓';
+          updateStatus(
+            'GPU compute engine ready! Click animate to start the demo.'
+          );
+
+          // Initial render
+          await renderFrame(0);
+
+          enableControls();
+        } catch (error) {
+          console.error('Failed to initialize GPU compute:', error);
+          document.getElementById('gpuStatus').textContent = 'Error ✗';
+          updateStatus(`Initialization failed: ${error.message}`, 'error');
+        }
+      }
+
+      function enableControls() {
+        document.getElementById('animateBtn').disabled = false;
+        document.getElementById('testBtn').disabled = false;
+        document.getElementById('intenseBtn').disabled = false;
+        document.getElementById('resetBtn').disabled = false;
+      }
+
+      async function renderFrame(time) {
+        if (!gpu) return;
+
+        const renderStart = performance.now();
+
+        try {
+          const normalizedTime = time * 0.001; // Convert to seconds
+          const pixels = await gpu.render_3d_frame(400, 400, normalizedTime);
+
+          const imageData = new ImageData(
+            new Uint8ClampedArray(new Uint8Array(pixels)),
+            400,
+            400
+          );
+          ctx.putImageData(imageData, 0, 0);
+
+          frameCount++;
+          const frameTime = performance.now() - renderStart;
+          updateMetrics(frameTime);
+        } catch (error) {
+          console.error('Render failed:', error);
+          updateStatus(`Render error: ${error.message}`, 'error');
+        }
+      }
+
+      function animate(currentTime) {
+        if (!isAnimating) return;
+
+        renderFrame(currentTime - startTime);
+        animationId = requestAnimationFrame(animate);
+      }
+
+      async function startAnimation() {
+        if (isAnimating) {
+          stopAnimation();
+          return;
+        }
+
+        if (!gpu) {
+          updateStatus('GPU not ready', 'error');
+          return;
+        }
+
+        isAnimating = true;
+        startTime = performance.now();
+        frameCount = 0;
+
+        document.getElementById('animateBtn').textContent = '⏸ Pause';
+        updateStatus('Animation running - watch the spinning cube!');
+
+        animationId = requestAnimationFrame(animate);
+      }
+
+      function stopAnimation() {
+        isAnimating = false;
+        cancelAnimationFrame(animationId);
+        document.getElementById('animateBtn').textContent = '▶ Animate';
+        updateStatus('Animation paused');
+      }
+
+      async function runAllTests() {
+        if (!gpu) {
+          updateStatus('GPU not ready', 'error');
+          return;
+        }
+
+        updateStatus('Running comprehensive GPU tests...', 'loading');
+
+        try {
+          // Test 1: Basic math operations
+          const mathStart = performance.now();
+          const testData = Array.from({ length: 10000 }, (_, i) => i + 1);
+          const doubled = await gpu.parallel_process(testData, 1, 2);
+          const mathTime = performance.now() - mathStart;
+
+          const mathResult = Array.from(new Uint32Array(doubled));
+          const mathCorrect = mathResult
+            .slice(0, 5)
+            .every((val, i) => val === (i + 1) * 2);
+
+          // Test 2: Large array processing
+          const largeStart = performance.now();
+          const largeData = Array.from({ length: 100000 }, (_, i) => i);
+          const largeResult = await gpu.parallel_process(largeData, 0, 42);
+          const largeTime = performance.now() - largeStart;
+
+          // Test 3: Multiple render frames
+          const renderStart = performance.now();
+          await Promise.all([
+            gpu.render_3d_frame(200, 200, 0.5),
+            gpu.render_3d_frame(200, 200, 1.0),
+            gpu.render_3d_frame(200, 200, 1.5),
+          ]);
+          const renderTime = performance.now() - renderStart;
+
+          const opsPerSecond = Math.round(100000 / (largeTime / 1000));
+          document.getElementById(
+            'computeSpeed'
+          ).textContent = `${opsPerSecond.toLocaleString()} ops/s`;
+
+          updateStatus(
+            `✅ All tests passed! Math: ${mathTime.toFixed(1)}ms | ` +
+              `Large array: ${largeTime.toFixed(1)}ms | ` +
+              `3D render: ${renderTime.toFixed(1)}ms | ` +
+              `Math accuracy: ${mathCorrect ? 'PASS' : 'FAIL'}`
+          );
+        } catch (error) {
+          console.error('Tests failed:', error);
+          updateStatus(`Test failed: ${error.message}`, 'error');
+        }
+      }
+
+      async function runIntenseTests() {
+        if (!gpu) {
+          updateStatus('GPU not ready', 'error');
+          return;
+        }
+
+        updateStatus(
+          '🔥 STRESS TEST INITIATED - This will push your GPU to its limits!',
+          'loading'
+        );
+
+        try {
+          const results = [];
+
+          // Test 1: Matrix Multiplication Mayhem (2500 operations per element)
+          updateStatus(
+            '🔥 Running matrix multiplication stress test...',
+            'loading'
+          );
+          const matrixStart = performance.now();
+          const matrixData = Array.from({ length: 50000 }, (_, i) => i + 1);
+          const matrixResult = await gpu.parallel_process(matrixData, 2, 0);
+          const matrixTime = performance.now() - matrixStart;
+
+          const matrixOps = 50000 * 2500; // 50k elements × 2500 ops each
+          const matrixGFLOPS = matrixOps / (matrixTime / 1000) / 1e9;
+          results.push(`Matrix: ${matrixGFLOPS.toFixed(2)} GFLOPS`);
+
+          // Test 2: Cryptographic Hash Hell (100 rounds per element)
+          updateStatus(
+            '🔥 Running cryptographic hash simulation...',
+            'loading'
+          );
+          const cryptoStart = performance.now();
+          const cryptoData = Array.from(
+            { length: 100000 },
+            (_, i) => i * 7 + 1
+          );
+          const cryptoResult = await gpu.parallel_process(cryptoData, 3, 0);
+          const cryptoTime = performance.now() - cryptoStart;
+
+          const cryptoOps = 100000 * 100 * 8; // 100k elements × 100 rounds × ~8 ops per round
+          const cryptoGFLOPS = cryptoOps / (cryptoTime / 1000) / 1e9;
+          results.push(`Crypto: ${cryptoGFLOPS.toFixed(2)} GFLOPS`);
+
+          // Test 3: Mandelbrot Madness (up to 1000 iterations per pixel)
+          updateStatus('🔥 Computing Mandelbrot set fractal...', 'loading');
+          const mandelbrotStart = performance.now();
+          const mandelbrotSize = 256;
+          const mandelbrotData = Array.from(
+            { length: mandelbrotSize * mandelbrotSize },
+            () => 0
+          );
+          const mandelbrotResult = await gpu.parallel_process(
+            mandelbrotData,
+            5,
+            0
+          );
+          const mandelbrotTime = performance.now() - mandelbrotStart;
+
+          const mandelbrotOps = mandelbrotSize * mandelbrotSize * 500; // Avg 500 iterations
+          const mandelbrotGFLOPS =
+            (mandelbrotOps * 10) / (mandelbrotTime / 1000) / 1e9; // ~10 ops per iteration
+          results.push(`Mandelbrot: ${mandelbrotGFLOPS.toFixed(2)} GFLOPS`);
+
+          // Test 4: Parallel Render Bombardment
+          updateStatus('🔥 Parallel 3D render bombardment...', 'loading');
+          const renderStart = performance.now();
+          await Promise.all([
+            gpu.render_3d_frame(400, 400, 0.1),
+            gpu.render_3d_frame(400, 400, 0.2),
+            gpu.render_3d_frame(400, 400, 0.3),
+            gpu.render_3d_frame(400, 400, 0.4),
+            gpu.render_3d_frame(400, 400, 0.5),
+          ]);
+          const renderTime = performance.now() - renderStart;
+
+          // Calculate total performance metrics
+          const totalTime =
+            matrixTime + cryptoTime + mandelbrotTime + renderTime;
+          const totalOps = matrixOps + cryptoOps + mandelbrotOps;
+          const totalGFLOPS = totalOps / (totalTime / 1000) / 1e9;
+
+          // Update UI metrics
+          document.getElementById('computeSpeed').textContent = `${(
+            totalOps /
+            (totalTime / 1000) /
+            1e6
+          ).toFixed(1)}M ops/s`;
+          document.getElementById(
+            'gflops'
+          ).textContent = `${totalGFLOPS.toFixed(2)}`;
+
+          updateStatus(
+            `🔥 STRESS TEST COMPLETE! 🔥 ` +
+              `Total: ${totalGFLOPS.toFixed(2)} GFLOPS | ` +
+              `${results.join(' | ')} | ` +
+              `5x Parallel Renders: ${renderTime.toFixed(1)}ms | ` +
+              `Total time: ${totalTime.toFixed(1)}ms`
+          );
+        } catch (error) {
+          console.error('Intense tests failed:', error);
+          updateStatus(`💥 Stress test failed: ${error.message}`, 'error');
+        }
+      }
+
+      async function runMLTest() {
+        if (!gpu) {
+          updateStatus('GPU not ready', 'error');
+          return;
+        }
+
+        updateStatus('🧠 Running neural network inference tests...', 'loading');
+
+        try {
+          const result = await gpu.run_ml_inference_test();
+
+          // Extract GFLOPS value for display
+          const gflopsMatch = result.match(
+            /Combined ML performance: ([\d.]+) GFLOPS/
+          );
+          if (gflopsMatch) {
+            updateStatus(`${gflopsMatch[1]} GFLOPS`);
+          }
+
+          updateStatus(`🧠 ML Inference Complete! ${result}`);
+        } catch (error) {
+          console.error('ML test failed:', error);
+          updateStatus(`🧠 ML test failed: ${error.message}`, 'error');
+        }
+      }
+
+      function resetDemo() {
+        stopAnimation();
+        frameCount = 0;
+        fpsHistory = [];
+        document.getElementById('frameCount').textContent = '0';
+        document.getElementById('fps').textContent = '0 FPS';
+        document.getElementById('frameTime').textContent = '0ms';
+        document.getElementById('computeSpeed').textContent = '0 ops/s';
+        document.getElementById('gflops').textContent = '0';
+
+        // Clear canvas
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, 400, 400);
+
+        updateStatus('Demo reset - ready for new tests');
+      }
+
+      // Global functions
+      window.startAnimation = startAnimation;
+      window.runAllTests = runAllTests;
+      window.runIntenseTests = runIntenseTests;
+      window.resetDemo = resetDemo;
+      window.runMLTest = runMLTest;
+
+      // Auto-initialize
+      setup();
+    </script>
+  </body>
+</html>

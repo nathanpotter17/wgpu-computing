@@ -1,0 +1,49 @@
+[package]
+name = "layerw"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "layerw"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "layerw-bin"
+path = "src/main.rs"
+
+[dependencies]
+winit = "0.30"
+wgpu = "25.0"
+glam = { version = "0.30", features = ["mint", "bytemuck"] }
+bytemuck = { version = "1.23", features = ["derive"] }
+bitflags = "2.9"
+log = "0.4"
+cfg-if = "1.0"
+pollster = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wgpu = {version = "25.0.0", features = ["webgpu"]}
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+console_error_panic_hook = "0.1.6"
+console_log = "1.0"
+js-sys = "0.3.77"
+web-sys = {version = "0.3", features = ["Document", "Window", "Performance", "Element", "HtmlCanvasElement", "console"]}
+
+[profile.release]
+opt-level = 3
+lto = true
+overflow-checks = false
+debug-assertions = false
+strip = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 2
+overflow-checks = true
+debug-assertions = true

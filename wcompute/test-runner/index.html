@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Enhanced WebGPU 3D Renderer Demo</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: #1a1a1a;
+        color: white;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      canvas {
+        border: 2px solid #333;
+        image-rendering: pixelated;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+      }
+      .controls {
+        margin-top: 15px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      button {
+        background: #333;
+        color: white;
+        border: 1px solid #666;
+        padding: 10px 16px;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: #444;
+      }
+      button.active {
+        background: #0066cc;
+        border-color: #0088ff;
+      }
+      .status {
+        margin-top: 15px;
+        font-size: 14px;
+        color: #ccc;
+        text-align: center;
+        max-width: 600px;
+      }
+      .metrics {
+        margin-top: 10px;
+        padding: 10px;
+        background: #2a2a2a;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        min-width: 400px;
+      }
+      .scene-buttons {
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 2px;
+        background: #2a2a2a;
+      }
+      .scene-buttons button {
+        margin: 0;
+        border-radius: 2px;
+      }
+      h1 {
+        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 2.5em;
+        margin-bottom: 10px;
+      }
+      .subtitle {
+        color: #888;
+        font-size: 1.1em;
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚀 Enhanced WebGPU 3D Renderer</h1>
+    <div class="subtitle">Full 65k Workgroup Compute Shader Capabilities</div>
+
+    <canvas id="canvas" width="512" height="512"></canvas>
+
+    <div class="controls">
+      <button onclick="startRendering()" id="startBtn">▶️ Start</button>
+      <button onclick="stopRendering()" id="stopBtn">⏹️ Stop</button>
+
+      <div class="scene-buttons">
+        <button onclick="switchScene('simple')" id="simpleBtn" class="active">
+          Simple Cube
+        </button>
+        <button onclick="switchScene('complex')" id="complexBtn">
+          Complex Scene (125 cubes)
+        </button>
+      </div>
+
+      <button onclick="changeResolution(256)">256×256</button>
+      <button onclick="changeResolution(512)">512×512</button>
+      <button onclick="changeResolution(1024)">1024×1024</button>
+      <button onclick="changeResolution(2048)">2048×2048</button>
+    </div>
+
+    <div class="status" id="status">Click Start to begin rendering</div>
+    <div class="metrics" id="metrics" style="display: none"></div>
+
+    <script type="module">
+      // Update this import path to match your actual WASM module location
+      import init, {
+        EnhancedNWRenderer,
+        PerformanceMetrics,
+      } from './wbg/wcompute.js';
+
+      let renderer = null;
+      let animationId = null;
+      let canvas = document.getElementById('canvas');
+      let ctx = canvas.getContext('2d');
+      let startTime = Date.now();
+      let frameCount = 0;
+      let lastFpsTime = Date.now();
+      let currentScene = 'simple'; // 'simple' or 'complex'
+      let deviceLimits = null;
+
+      async function initRenderer() {
+        try {
+          updateStatus('🔄 Initializing Enhanced WebGPU Renderer...');
+          await init();
+
+          updateStatus(
+            '🏗️ Creating enhanced 3D renderer with full compute capabilities...'
+          );
+          renderer = await new EnhancedNWRenderer();
+
+          // Get device limits for display
+          deviceLimits = renderer.get_device_limits();
+
+          updateStatus('🚀 ENHANCED WEBGPU RENDERER READY! 🚀');
+          updateMetrics();
+          return true;
+        } catch (e) {
+          console.error('Failed to initialize enhanced WASM renderer:', e);
+          updateStatus(
+            '❌ Enhanced renderer initialization failed: ' + e.message
+          );
+
+          // Fallback renderer for debugging
+          renderer = {
+            render_demo_cube: async (width, height, time) => {
+              const pixels = new Uint8Array(width * height * 4);
+              // Animated gradient pattern
+              for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                  const i = (y * width + x) * 4;
+                  const wave = Math.sin((x + y + time * 50) * 0.02) * 127 + 128;
+                  pixels[i] = wave; // R
+                  pixels[i + 1] = Math.sin(time * 2) * 127 + 128; // G
+                  pixels[i + 2] = Math.cos(time * 1.5) * 127 + 128; // B
+                  pixels[i + 3] = 255; // A
+                }
+              }
+              return pixels;
+            },
+            render_complex_scene: async (width, height, time) => {
+              // Same fallback but with different colors
+              return await renderer.render_demo_cube(width, height, time);
+            },
+            get_device_limits: () => ({
+              maxComputeWorkgroupsPerDimension: 'fallback',
+              maxBufferSize: 'fallback',
+            }),
+          };
+          updateStatus('⚠️ Using fallback renderer for debugging');
+          return true;
+        }
+      }
+
+      async function renderFrame() {
+        if (!renderer) return;
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const time = (Date.now() - startTime) / 1000;
+
+        try {
+          let pixels;
+          if (currentScene === 'complex') {
+            pixels = await renderer.render_complex_scene(width, height, time);
+          } else {
+            pixels = await renderer.render_demo_cube(width, height, time);
+          }
+
+          // Convert to ImageData and draw
+          const imageData = new ImageData(
+            new Uint8ClampedArray(pixels),
+            width,
+            height
+          );
+          ctx.putImageData(imageData, 0, 0);
+
+          // Update FPS
+          frameCount++;
+          const now = Date.now();
+          if (now - lastFpsTime > 1000) {
+            const fps = frameCount / ((now - lastFpsTime) / 1000);
+            const sceneInfo =
+              currentScene === 'complex'
+                ? ' (3000 triangles)'
+                : ' (12 triangles)';
+            updateStatus(`🎯 Rendering at ${fps.toFixed(1)} FPS${sceneInfo}`);
+            frameCount = 0;
+            lastFpsTime = now;
+            updateMetrics();
+          }
+        } catch (e) {
+          console.error('Render error:', e);
+          updateStatus('❌ Render error: ' + e.message);
+          stopRendering();
+        }
+      }
+
+      function animate() {
+        renderFrame();
+        animationId = requestAnimationFrame(animate);
+      }
+
+      function updateMetrics() {
+        const width = canvas.width;
+        const height = canvas.height;
+        const triangles = currentScene === 'complex' ? 3000 : 12;
+        const vertices = currentScene === 'complex' ? 3000 : 24;
+
+        const metrics = new PerformanceMetrics(
+          width,
+          height,
+          triangles,
+          vertices
+        );
+        const maxRes = metrics.theoretical_max_resolution_for_workgroups();
+
+        const metricsDiv = document.getElementById('metrics');
+        metricsDiv.style.display = 'block';
+        metricsDiv.innerHTML = `
+          <strong>Performance Metrics:</strong><br>
+          Resolution: ${width}×${height} (${metrics.pixel_count.toLocaleString()} pixels)<br>
+          Triangles: ${metrics.triangle_count.toLocaleString()}<br>
+          Vertices: ${metrics.vertex_count.toLocaleString()}<br>
+          Workgroups: ${metrics.workgroup_count.toLocaleString()}<br>
+          Max Theoretical Resolution: ${maxRes}×${maxRes}<br>
+          ${
+            deviceLimits
+              ? `Max Workgroups: ${deviceLimits.maxComputeWorkgroupsPerDimension?.toLocaleString()}`
+              : ''
+          }
+        `;
+      }
+
+      window.startRendering = async function () {
+        if (!renderer) {
+          const success = await initRenderer();
+          if (!success) return;
+        }
+
+        if (animationId) return; // Already running
+
+        document.getElementById('startBtn').textContent = '⏸️ Running';
+        startTime = Date.now();
+        frameCount = 0;
+        lastFpsTime = Date.now();
+        animate();
+        updateStatus('🎬 Rendering started...');
+      };
+
+      window.stopRendering = function () {
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+          document.getElementById('startBtn').textContent = '▶️ Start';
+          updateStatus('⏹️ Rendering stopped');
+        }
+      };
+
+      window.changeResolution = function (size) {
+        const wasRunning = animationId !== null;
+        stopRendering();
+        canvas.width = size;
+        canvas.height = size;
+        updateStatus(`📐 Resolution changed to ${size}×${size}`);
+        updateMetrics();
+
+        if (wasRunning) {
+          setTimeout(() => startRendering(), 100);
+        }
+      };
+
+      window.switchScene = function (scene) {
+        const wasRunning = animationId !== null;
+        stopRendering();
+
+        currentScene = scene;
+
+        // Update button states
+        document
+          .getElementById('simpleBtn')
+          .classList.toggle('active', scene === 'simple');
+        document
+          .getElementById('complexBtn')
+          .classList.toggle('active', scene === 'complex');
+
+        const sceneDesc =
+          scene === 'complex'
+            ? 'Complex Scene (125 cubes, 3000 triangles)'
+            : 'Simple Cube (12 triangles)';
+        updateStatus(`🎭 Switched to: ${sceneDesc}`);
+        updateMetrics();
+
+        if (wasRunning) {
+          setTimeout(() => startRendering(), 100);
+        }
+      };
+
+      function updateStatus(message) {
+        document.getElementById('status').textContent = message;
+      }
+
+      // Auto-initialize on page load
+      window.addEventListener('load', () => {
+        initRenderer();
+      });
+    </script>
+  </body>
+</html>
